@@ -21,7 +21,14 @@ capacity = 1
 poweroutput = 1
 #starting load of the battery
 load = 0
-
+#verbunden mit solar 1: nein, 0: ja
+solarconnection = 0
+#eigener solar park:1 soalrpark als vertriebspartner: 0
+solarequity = 1
+#vertragt mit solar betreiber, für wie viel prozent mehr er steurfrei verjaufen darf (30% wären max, vertriebspartner bekommt nichts für kooperation)
+vertagspauschale = 0.3
+#liste of power of soalr panel (imortant to start data at same time) size is ireellevant, sinze it it ist cut of later
+solarkapazität = np.random.uniform(low = 0.0, high=0.3, size=100)
 
 # structures the market in a way that vor every time the price and the traiding avialabilty can be seen
 def marketstructure(t0, x1, x2, x3):
@@ -37,7 +44,13 @@ def marketstructure(t0, x1, x2, x3):
         else:
             p.append(np.nan)
             p.append(np.nan)
+        if solarequity == 1:
+            p.append(0)
+        elif solarequity == 0:
+            p.append(x1[t1]-x1[t1]*vertagspauschale)
         structuredMarket.append(p)
+        #hier kann noch solar hinzugefügt werden in dem man einen liste mit 0n macht an den zeiten an denen die sonne schein
+        #(unten muss dann die kapahinzugefügt werden)
         t1 += 1
     return structuredMarket
 
@@ -56,18 +69,25 @@ def shuffelMarket(lst):
         slices.append(lst[start:])
         yield slices
 
-
+#hier wird bei sell der solar raus geschnitten, da dieser nicht verkauft werdden kann
 def cutSellAndBuy(marketpart):
     return marketpart[0:math.floor(len(marketpart) / 2) -1], marketpart[math.floor(len(marketpart) / 2):len(marketpart)]
 
 
+
+#die liste für die leistung die aus der solarzelle kommt auf die lönge des market anpassen
+def solarcapacity(solarkapazität):
+    return solarkapazität[0:len(marketstructure(t0, x1, x2, x3))]
+solarcapa = solarcapacity(solarkapazität)
+
 # funktion die eine liste erstellt bei der jeder preis der entsprechenden handlsziet zugeordnet wird
 # erster wert is der index in der liste um ihn später zu löschen, zweiter dei kapazität und 3. der preis
+#hier muss für solar der kapa array eingearbeitet werden
 def priceToKapa(marketpart, capacity):
     priceToKapalist = []
-    capacityList = [capacity * 0.25, capacity * 0.5, capacity * 1.0]
     for i in range(len(marketpart)):
-        for j in range(len(marketpart[i])):
+        capacityList = [capacity * 0.25, capacity * 0.5, capacity * 1.0, solarcapa[i]]
+        for j in range(len(marketpart[i])-solarconnection):
             pricekapaPair = [capacityList[j], marketpart[i][j]]
             priceToKapalist.append(pricekapaPair)
             j += 1
@@ -79,7 +99,7 @@ def priceToKapa(marketpart, capacity):
 def priceToIndex(marketpart):
     priceToIndexlist = []
     for i in range(len(marketpart)):
-        for j in range(len(marketpart[i])):
+        for j in range(len(marketpart[i])-solarconnection):
             priceIndexPair = marketpart[i][j]
             priceToIndexlist.append(priceIndexPair)
             j += 1
@@ -193,9 +213,9 @@ def iterationOverTime(alldata):
     profit = 0
     i = 0
     #how far into the future the calculation shoulf go (more than 4 hours takes very long due to exponential calc time)
-    calculationhorizion = 4
+    calculationhorizion = 3
     while i < len(alldata):
-        strategy = maximalStrategy(shuffelMarket(alldata[i:i+calculationhorizion*4]))[3]
+        strategy = maximalStrategy(shuffelMarket(alldata[i:i+math.floor(calculationhorizion*4)]))[3]
         if strategy:
             counter = 0
             if len(strategy[0]) == 1:
